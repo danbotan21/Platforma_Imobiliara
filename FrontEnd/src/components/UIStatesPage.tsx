@@ -9,6 +9,30 @@ const trustLevels: Array<[string,string]> = [
 export function UIStatesPage({ navigate, notify }: SharedPageProps) {
   const [reportOpen,setReportOpen] = useState(false)
   const [toastDemo,setToastDemo] = useState<'alert'|'success'>('alert')
+  const [uploadReady,setUploadReady] = useState(false)
+
+  const runStateAction = (action: string) => {
+    const routes: Record<string, string> = {
+      'Resetează filtrele': '/chirie',
+      'Editează filtrele': '/chirie',
+      'Scrie o recenzie': '/scrie-recenzie',
+      'Adaugă informații': '/adauga-informatii',
+      'Explorează proprietăți': '/chirie',
+      'Vezi dosarul': '/proprietate/lev-tolstoi-24',
+      'Vezi sursa': '/cum-verificam-datele',
+    }
+    if (action === 'Alege un fișier') {
+      setUploadReady(true)
+      notify('Fișier demonstrativ selectat.')
+      return
+    }
+    if (action === 'Încearcă din nou') {
+      notify('Conținutul demonstrativ a fost reîncărcat.')
+      return
+    }
+    const route = routes[action]
+    if (route) navigate(route)
+  }
   return <div className='ui-states-page'>
     <section className='ui-states-hero'><div className='container'><div><span><Icon name='settings' size={18} /> Sistem UI demonstrativ</span><h1>Stări clare pentru fiecare situație.</h1><p>Exemple complete pentru încărcare, lipsa datelor, erori, formulare, upload, transparență și confirmări.</p></div><button className='button button-secondary' type='button' onClick={() => navigate('/cum-verificam-datele')}>Vezi metodologia datelor</button></div></section>
     <nav className='states-anchor-nav'><div className='container'>{['Încărcare','Stări goale','Erori','Formulare','Încredere','Feedback'].map((item,index) => <a href={`#state-${index}`} key={item}>{item}</a>)}</div></nav>
@@ -21,13 +45,13 @@ export function UIStatesPage({ navigate, notify }: SharedPageProps) {
         ['history','Istoric necunoscut','Nu au fost adăugate evenimente. Absența datelor nu confirmă lipsa lor.','Adaugă informații'],
         ['heart','Colecție goală','Salvează proprietăți pentru a le compara sau urmări schimbările.','Explorează proprietăți'],
         ['file','Upload gol','Adaugă documentul doar dacă este relevant și anonimizat.','Alege un fișier'],
-      ].map(([icon,title,text,action]) => <article className='state-empty-card' key={title}><span><Icon name={icon as IconName} /></span><h3>{title}</h3><p>{text}</p><button type='button'>{action}</button></article>)}</div></StateGroup>
+      ].map(([icon,title,text,action]) => <article className='state-empty-card' key={title}><span><Icon name={icon as IconName} /></span><h3>{title}</h3><p>{text}</p><button type='button' onClick={() => runStateAction(action)}>{action === 'Alege un fișier' && uploadReady ? 'Fișier selectat' : action}</button></article>)}</div></StateGroup>
       <StateGroup id='state-2' label='03 · Erori și indisponibilitate' title='Problema, efectul și ieșirea sunt vizibile împreună'><div className='state-demo-grid three'>{[
         ['alert','Nu am putut încărca rezultatele','Conexiunea a fost întreruptă. Filtrele selectate au fost păstrate.','Încearcă din nou','error'],
         ['building','Proprietate indisponibilă','Anunțul nu mai acceptă cereri, dar dosarul istoric rămâne vizibil.','Vezi dosarul','warning'],
         ['shield','Date neverificate','Prețul a fost raportat de comunitate și nu are încă o sursă confirmată.','Vezi sursa','neutral'],
-      ].map(([icon,title,text,action,tone]) => <article className={`state-error-card ${tone}`} key={title}><span><Icon name={icon as IconName} /></span><div><h3>{title}</h3><p>{text}</p><button type='button'>{action}</button></div></article>)}</div></StateGroup>
-      <StateGroup id='state-3' label='04 · Formulare și upload' title='Validarea apare lângă informația care trebuie corectată'><div className='state-demo-grid two'><article className='state-surface'><StateHeader icon='file' title='Formular incomplet' tag='Necesită atenție' /><div className='incomplete-form-demo'><label>Adresa<input value='str. Lev Tolstoi' readOnly /><small><Icon name='alert' size={13} /> Adaugă numărul blocului.</small></label><label>Suprafață<input placeholder='Exemplu: 64 m²' /><small><Icon name='alert' size={13} /> Acest câmp este obligatoriu.</small></label><button className='button button-primary' type='button' disabled>Continuă</button></div></article><article className='state-surface'><StateHeader icon='renovation' title='Încărcarea fotografiilor' tag='Gol / reușit' /><div className='upload-state-demo'><button type='button'><Icon name='plus' /><strong>Adaugă fotografii</strong><small>JPG sau PNG · maximum 15 MB</small></button><div><span><Icon name='check' /> living-principal.jpg</span><strong>Încărcare reușită</strong><small>2,8 MB · imagine principală</small></div></div></article></div></StateGroup>
+      ].map(([icon,title,text,action,tone]) => <article className={`state-error-card ${tone}`} key={title}><span><Icon name={icon as IconName} /></span><div><h3>{title}</h3><p>{text}</p><button type='button' onClick={() => runStateAction(action)}>{action}</button></div></article>)}</div></StateGroup>
+      <StateGroup id='state-3' label='04 · Formulare și upload' title='Validarea apare lângă informația care trebuie corectată'><div className='state-demo-grid two'><article className='state-surface'><StateHeader icon='file' title='Formular incomplet' tag='Necesită atenție' /><div className='incomplete-form-demo'><label>Adresa<input value='str. Lev Tolstoi' readOnly /><small><Icon name='alert' size={13} /> Adaugă numărul blocului.</small></label><label>Suprafață<input placeholder='Exemplu: 64 m²' /><small><Icon name='alert' size={13} /> Acest câmp este obligatoriu.</small></label><button className='button button-primary' type='button' disabled>Continuă</button></div></article><article className='state-surface'><StateHeader icon='renovation' title='Încărcarea fotografiilor' tag='Gol / reușit' /><div className='upload-state-demo'><button className={uploadReady ? 'active' : ''} type='button' onClick={() => { setUploadReady((current) => !current); notify(uploadReady ? 'Fotografia demonstrativă a fost eliminată.' : 'Fotografia demonstrativă a fost selectată.') }}><Icon name={uploadReady ? 'check' : 'plus'} /><strong>{uploadReady ? 'Fotografie selectată' : 'Adaugă fotografii'}</strong><small>JPG sau PNG · maximum 15 MB</small></button><div><span><Icon name='check' /> living-principal.jpg</span><strong>Încărcare reușită</strong><small>2,8 MB · imagine principală</small></div></div></article></div></StateGroup>
       <StateGroup id='state-4' label='05 · Încredere și transparență' title='Aceleași etichete pentru toate informațiile importante'><div className='trust-state-panel'><div>{trustLevels.map(([tone,label]) => <span className={`trust-label ${tone}`} key={label}>{label}</span>)}</div><article><Icon name='info' /><div><strong>Eticheta descrie sursa, nu garantează rezultatul</strong><p>O informație verificată confirmă legătura cu sursa analizată. Utilizatorul trebuie să consulte contextul și data.</p></div></article></div></StateGroup>
       <StateGroup id='state-5' label='06 · Feedback și confirmări' title='Acțiunile importante primesc răspuns vizual imediat'><div className='state-demo-grid two'><article className='state-surface'><StateHeader icon='message' title='Mesaje inline' tag='Alertă / confirmare' /><div className={`feedback-demo ${toastDemo}`}><Icon name={toastDemo === 'alert' ? 'alert' : 'check'} /><div><strong>{toastDemo === 'alert' ? 'Informații lipsă' : 'Modificări salvate'}</strong><p>{toastDemo === 'alert' ? 'Completează anul construcției înainte de trimitere.' : 'Draftul poate fi continuat din „Anunțurile mele”.'}</p></div></div><div className='feedback-switch'><button className={toastDemo === 'alert' ? 'active' : ''} type='button' onClick={() => setToastDemo('alert')}>Alertă</button><button className={toastDemo === 'success' ? 'active' : ''} type='button' onClick={() => setToastDemo('success')}>Confirmare</button></div></article><article className='state-surface report-demo'><StateHeader icon='shield' title='Raportare' tag='Modal' /><p>Raportarea creează un caz separat și nu schimbă automat informația publică.</p><button className='button button-secondary' type='button' onClick={() => setReportOpen(true)}>Deschide modalul</button></article></div></StateGroup>
     </div></section>

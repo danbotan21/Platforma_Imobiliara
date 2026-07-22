@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { properties, recentReviews, type SharedPageProps } from '../data'
 import { Icon, type IconName } from './Icon'
 
@@ -14,6 +15,8 @@ const contributions: Array<{ icon: IconName; title: string; text: string; action
 ]
 
 export function HomeCommunity({ navigate }: Pick<SharedPageProps, 'navigate'>) {
+  const [helpful, setHelpful] = useState<Record<string, boolean>>({})
+
   return (
     <>
       <section className='section reviews-home-section'>
@@ -27,7 +30,7 @@ export function HomeCommunity({ navigate }: Pick<SharedPageProps, 'navigate'>) {
               <div className='review-sides'><span><b>Avantaje</b>{recentReviews[0].pros}</span><span><b>Dezavantaje</b>{recentReviews[0].cons}</span></div>
             </article>
             <div className='review-stack'>
-              {recentReviews.slice(1).map((review) => <article key={review.id}><header><span className='avatar'>{review.initials}</span><div><strong>{review.name}</strong><small>{review.role}</small></div><b><Icon name='star' size={15} /> {review.rating.toLocaleString('ro-RO')}</b></header><p>{review.text}</p><footer><span>{review.property}</span><button type='button'>Utilă ({review.helpful})</button></footer></article>)}
+              {recentReviews.slice(1).map((review) => <article key={review.id}><header><span className='avatar'>{review.initials}</span><div><strong>{review.name}</strong><small>{review.role}</small></div><b><Icon name='star' size={15} /> {review.rating.toLocaleString('ro-RO')}</b></header><p>{review.text}</p><footer><span>{review.property}</span><button className={helpful[review.id] ? 'active' : ''} type='button' aria-pressed={Boolean(helpful[review.id])} onClick={() => setHelpful((current) => ({ ...current, [review.id]: !current[review.id] }))}>{helpful[review.id] ? 'Marcată utilă' : 'Utilă'} ({review.helpful + Number(Boolean(helpful[review.id]))})</button></footer></article>)}
             </div>
           </div>
         </div>

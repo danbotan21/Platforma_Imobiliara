@@ -17,7 +17,7 @@ export function HomeHero({ navigate }: Pick<SharedPageProps, 'navigate'>) {
       <div className='container hero-v2-layout'>
         <div className='hero-v2-copy'>
           <div className='hero-trust-line'><Icon name='shield' size={18} /> Proprietăți, istoric și recenzii într-un singur loc</div>
-          <h1>Alege locuința cu toate datele pe masă.</h1>
+          <h1>Alege locuința cu <span>toate datele</span> pe masă.</h1>
           <p>Caută apartamente de închiriat sau de cumpărat în Chișinău. Vezi prețuri anterioare, renovări, perioade de chirie și recenzii verificate înainte să decizi.</p>
 
           <div className='hero-search-v2'>

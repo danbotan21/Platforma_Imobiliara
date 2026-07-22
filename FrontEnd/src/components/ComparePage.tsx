@@ -28,8 +28,7 @@ const rows: CompareRow[] = [
 
 export function ComparePage({ compare, navigate, toggleCompare }: SharedPageProps) {
   const [differencesOnly, setDifferencesOnly] = useState(false)
-  const fallback = properties.filter((property) => property.mode === 'rent').slice(0, 3)
-  const selected = compare.length ? properties.filter((property) => compare.includes(property.id)).slice(0, 3) : fallback
+  const selected = properties.filter((property) => compare.includes(property.id)).slice(0, 3)
   const groups = [...new Set(rows.map((row) => row.group))]
   const visibleRows = rows.filter((row) => !differencesOnly || new Set(selected.map((property,index) => row.value(property,index))).size > 1)
 
@@ -39,6 +38,11 @@ export function ComparePage({ compare, navigate, toggleCompare }: SharedPageProp
     const target = row.prefer === 'high' ? Math.max(...values) : Math.min(...values)
     return row.score(property,index) === target && values.filter((value) => value === target).length === 1
   }
+
+  if (!selected.length) return <div className='compare-page-v2'>
+    <section className='compare-hero'><div className='container'><div><span><Icon name='compare' size={18} /> Comparație proprietăți</span><h1>Alege proprietățile pe care vrei să le compari.</h1><p>Adaugă până la trei proprietăți din rezultate sau de pe hartă. Selecția rămâne salvată în acest browser.</p></div><button className='button button-primary' type='button' onClick={() => navigate('/chirie')}><Icon name='plus' size={17} /> Explorează proprietăți</button></div></section>
+    <section className='section'><div className='container empty-state'><span><Icon name='compare' size={34} /></span><h2>Nu ai selectat încă nicio proprietate</h2><p>Folosește opțiunea „Compară” de pe cardurile proprietăților, apoi revino aici.</p><div><button className='button button-primary' type='button' onClick={() => navigate('/chirie')}>Vezi chirii</button><button className='button button-secondary' type='button' onClick={() => navigate('/cumpara')}>Vezi proprietăți de vânzare</button></div></div></section>
+  </div>
 
   return <div className='compare-page-v2'>
     <section className='compare-hero'><div className='container'><div><span><Icon name='compare' size={18} /> Comparație proprietăți</span><h1>Pune decizia pe aceleași criterii.</h1><p>Compară maximum trei proprietăți. Evidențierea arată doar cea mai bună valoare numerică, nu o recomandare automată.</p></div><button className='button button-secondary' type='button' onClick={() => navigate('/chirie')}><Icon name='plus' size={17} /> Adaugă proprietate</button></div></section>

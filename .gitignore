@@ -102,4 +102,8 @@ $RECYCLE.BIN/
 *.swp
 *.swo
 *~
-
+# Local Linux dependencies generated through WSL
+_node_modules_linux/
+_node_modules_linux.previous/
+_node_modules_linux.tar.gz
+._linux_modules_build/
