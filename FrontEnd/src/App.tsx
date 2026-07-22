@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
+import { PremiumEffects } from './components/PremiumEffects'
 import { properties } from './data'
 
 const HomePage = lazy(() => import('./components/HomePage').then((module) => ({ default: module.HomePage })))
@@ -25,8 +26,22 @@ const UIStatesPage = lazy(() => import('./components/UIStatesPage').then((module
 
 export function App() {
   const [path, setPath] = useState(() => window.location.pathname || '/')
-  const [favorites, setFavorites] = useState<string[]>([properties[1].id])
-  const [compare, setCompare] = useState<string[]>([])
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      const saved = window.localStorage.getItem('locuinta:favorites')
+      return saved ? JSON.parse(saved) : [properties[1].id]
+    } catch {
+      return [properties[1].id]
+    }
+  })
+  const [compare, setCompare] = useState<string[]>(() => {
+    try {
+      const saved = window.localStorage.getItem('locuinta:compare')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
@@ -40,6 +55,14 @@ export function App() {
   }, [path])
 
   useEffect(() => {
+    window.localStorage.setItem('locuinta:favorites', JSON.stringify(favorites))
+  }, [favorites])
+
+  useEffect(() => {
+    window.localStorage.setItem('locuinta:compare', JSON.stringify(compare))
+  }, [compare])
+
+  useEffect(() => {
     if (!toast) return
     const timer = window.setTimeout(() => setToast(null), 2800)
     return () => window.clearTimeout(timer)
@@ -51,8 +74,11 @@ export function App() {
   }
 
   const toggleFavorite = (id: string) => {
-    setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
-    setToast(favorites.includes(id) ? 'Eliminat din favorite' : 'Proprietate salvată')
+    setFavorites((current) => {
+      const isSaved = current.includes(id)
+      setToast(isSaved ? 'Eliminat din favorite' : 'Proprietate salvată')
+      return isSaved ? current.filter((item) => item !== id) : [...current, id]
+    })
   }
 
   const toggleCompare = (id: string) => {
@@ -83,13 +109,18 @@ export function App() {
   else if (path === '/adauga-informatii') page = <GuidedFlowPage kind="contribute" {...shared} />
   else if (path === '/comparatie') page = <ComparePage {...shared} />
   else if (path === '/dashboard') page = <DashboardPage {...shared} />
-  else if (path === '/onboarding') page = <OnboardingPage role="seeker" navigate={navigate} />
-  else if (path === '/onboarding-proprietar') page = <OnboardingPage role="owner" navigate={navigate} />
-  else if (path === '/onboarding-agent') page = <OnboardingPage role="agent" navigate={navigate} />
+  else if (path === '/onboarding') page = <OnboardingPage role="seeker" navigate={navigate} notify={setToast} />
+  else if (path === '/onboarding-proprietar') page = <OnboardingPage role="owner" navigate={navigate} notify={setToast} />
+  else if (path === '/onboarding-agent') page = <OnboardingPage role="agent" navigate={navigate} notify={setToast} />
   else if (path.startsWith('/agent/')) page = <PublicProfessionalPage kind="agent" {...shared} />
   else if (path.startsWith('/agentie/')) page = <PublicProfessionalPage kind="agency" {...shared} />
   else if (path === '/autentificare' || path === '/inregistrare') page = <AuthPage register={path === '/inregistrare'} navigate={navigate} notify={setToast} />
-  else if (path.startsWith('/proprietate/')) page = <PropertyPage slug={path.replace('/proprietate/', '')} {...shared} />
+  else if (path.startsWith('/proprietate/')) {
+    const slug = path.replace('/proprietate/', '')
+    page = properties.some((property) => property.slug === slug)
+      ? <PropertyPage slug={slug} {...shared} />
+      : <InfoPage kind="not-found" navigate={navigate} notify={setToast} />
+  }
   else if (path.startsWith('/bloc/')) page = <BuildingPage {...shared} />
   else if (path.startsWith('/zona/')) page = <AreaPage {...shared} />
   else if (path === '/recomandari') page = <WorkspaceHubPage kind="recommendations" {...shared} />
@@ -120,21 +151,21 @@ export function App() {
   else if (path === '/roluri-agentie') page = <WorkspaceHubPage kind="roles" {...shared} />
   else if (path === '/statistici-agentie') page = <WorkspaceHubPage kind="agency-stats" {...shared} />
   else if (path === '/verificare-agentie') page = <WorkspaceHubPage kind="agency-verification" {...shared} />
-  else if (path === '/admin') page = <AdminPage kind="dashboard" navigate={navigate} />
-  else if (path === '/admin/anunturi') page = <AdminPage kind="listings" navigate={navigate} />
-  else if (path === '/admin/recenzii') page = <AdminPage kind="reviews" navigate={navigate} />
-  else if (path === '/admin/documente') page = <AdminPage kind="documents" navigate={navigate} />
-  else if (path === '/admin/verificari') page = <AdminPage kind="verifications" navigate={navigate} />
-  else if (path === '/admin/duplicate') page = <AdminPage kind="duplicates" navigate={navigate} />
-  else if (path === '/admin/dispute') page = <AdminPage kind="disputes" navigate={navigate} />
-  else if (path === '/admin/raportari') page = <AdminPage kind="reports" navigate={navigate} />
-  else if (path === '/admin/utilizatori') page = <AdminPage kind="users" navigate={navigate} />
-  else if (path === '/admin/suspendari') page = <AdminPage kind="suspensions" navigate={navigate} />
-  else if (path === '/admin/stergeri') page = <AdminPage kind="deletions" navigate={navigate} />
-  else if (path === '/admin/audit') page = <AdminPage kind="audit" navigate={navigate} />
-  else if (path === '/admin/blocuri') page = <AdminPage kind="buildings" navigate={navigate} />
-  else if (path === '/admin/zone') page = <AdminPage kind="areas" navigate={navigate} />
-  else if (path === '/admin/categorii') page = <AdminPage kind="taxonomy" navigate={navigate} />
+  else if (path === '/admin') page = <AdminPage kind="dashboard" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/anunturi') page = <AdminPage kind="listings" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/recenzii') page = <AdminPage kind="reviews" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/documente') page = <AdminPage kind="documents" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/verificari') page = <AdminPage kind="verifications" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/duplicate') page = <AdminPage kind="duplicates" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/dispute') page = <AdminPage kind="disputes" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/raportari') page = <AdminPage kind="reports" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/utilizatori') page = <AdminPage kind="users" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/suspendari') page = <AdminPage kind="suspensions" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/stergeri') page = <AdminPage kind="deletions" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/audit') page = <AdminPage kind="audit" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/blocuri') page = <AdminPage kind="buildings" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/zone') page = <AdminPage kind="areas" navigate={navigate} notify={setToast} />
+  else if (path === '/admin/categorii') page = <AdminPage kind="taxonomy" navigate={navigate} notify={setToast} />
   else if (path === '/despre') page = <InfoPage kind="about" navigate={navigate} notify={setToast} />
   else if (path === '/cum-functioneaza') page = <InfoPage kind="how" navigate={navigate} notify={setToast} />
   else if (path === '/contact') page = <InfoPage kind="contact" navigate={navigate} notify={setToast} />
@@ -171,6 +202,7 @@ export function App() {
 
   return (
     <div className="app-shell">
+      <PremiumEffects path={path} />
       {!standalonePage && <Header path={path} favorites={favorites.length} navigate={navigate} />}
       <main>
         <Suspense fallback={<div className="page-loading" aria-live="polite"><div className="skeleton-line wide" /><div className="skeleton-grid"><i /><i /><i /></div><span>Se pregătește pagina…</span></div>}>

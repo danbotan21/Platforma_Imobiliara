@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Navigate } from '../data'
 import { Icon } from './Icon'
 
@@ -14,6 +14,14 @@ const navigation = [
 
 export function Header({ path, favorites, navigate }: HeaderProps) {
   const [open, setOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const update = () => setScrolled(window.scrollY > 14)
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
+  }, [])
 
   const go = (nextPath: string) => {
     navigate(nextPath)
@@ -21,7 +29,7 @@ export function Header({ path, favorites, navigate }: HeaderProps) {
   }
 
   return (
-    <header className='site-header'>
+    <header className={scrolled ? 'site-header scrolled' : 'site-header'}>
       <div className='container header-inner'>
         <button className='brand' type='button' onClick={() => go('/')} aria-label='Locuința.md, pagina principală'>
           <span className='brand-mark' aria-hidden='true'><i /><i /><i /></span>
@@ -34,7 +42,7 @@ export function Header({ path, favorites, navigate }: HeaderProps) {
             <button type='button' aria-label='Închide meniul' onClick={() => setOpen(false)}><Icon name='close' /></button>
           </div>
           {navigation.map((item) => (
-            <button className={path === item.path ? 'active' : ''} type='button' onClick={() => go(item.path)} key={item.path}>{item.label}</button>
+            <button className={path === item.path ? 'active' : ''} type='button' aria-current={path === item.path ? 'page' : undefined} onClick={() => go(item.path)} key={item.path}>{item.label}</button>
           ))}
           <div className='mobile-menu-tools'>
             <button type='button' onClick={() => go('/favorite')}><Icon name='heart' /> Favorite <b>{favorites}</b></button>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { galleryImages, historyEvents, money, occupancyHistory, ownerHistory, properties, propertyBySlug, recentReviews, type SharedPageProps } from '../data'
 import { BeforeAfterSlider } from './BeforeAfterSlider'
 import { Icon } from './Icon'
@@ -17,15 +17,90 @@ export function PropertyPage({ slug, ...shared }: PropertyPageProps) {
   const property = propertyBySlug(slug)
   const [modal, setModal] = useState<'contact' | 'report' | null>(null)
   const [galleryOpen, setGalleryOpen] = useState(false)
+  const [historyMode, setHistoryMode] = useState<'rent' | 'sale'>(() => property.mode)
+  const [reviewFilter, setReviewFilter] = useState('Toate')
+  const [reviewSort, setReviewSort] = useState('Cele mai utile')
+  const [helpfulReviews, setHelpfulReviews] = useState<Record<string, boolean>>({})
+  const [contactName, setContactName] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+  const [reportDetails, setReportDetails] = useState('')
+  const [activeSection, setActiveSection] = useState('prezentare')
   const saved = shared.favorites.includes(property.id)
   const compared = shared.compare.includes(property.id)
   const isRent = property.mode === 'rent'
+
+  const visibleHistoryEvents = historyMode === 'rent'
+    ? historyEvents.filter((event) => event.event !== 'Tranzacție')
+    : historyEvents.filter((event) => event.event === 'Tranzacție' || event.event === 'Renovare completă')
+  const historyMetrics = historyMode === 'rent'
+    ? [['Preț curent', '€650/lună'], ['Preț anterior', '€615/lună'], ['Minim înregistrat', '€450/lună'], ['Maxim înregistrat', '€650/lună'], ['Schimbare totală', '+44,4%'], ['Preț/m²', '€10,15']]
+    : [['Preț curent estimat', '€118.500'], ['Ultima tranzacție', '€71.000'], ['Minim înregistrat', '€71.000'], ['Maxim înregistrat', '€118.500'], ['Schimbare totală', '+66,9%'], ['Preț/m²', '€1.852']]
+  const propertyReviews = useMemo(() => {
+    const filtered = recentReviews.filter((review) => {
+      if (reviewFilter === 'Chiriași') return review.role.toLocaleLowerCase('ro-RO').includes('chiriaș')
+      if (reviewFilter === 'Cumpărători') return review.role.toLocaleLowerCase('ro-RO').includes('cumpărător')
+      if (reviewFilter === 'Cu fotografii') return review.id === 'REC-101'
+      return true
+    })
+    if (reviewSort === 'Rating mare') return [...filtered].sort((a, b) => b.rating - a.rating)
+    if (reviewSort === 'Cele mai noi') return [...filtered].reverse()
+    return [...filtered].sort((a, b) => (b.helpful + Number(Boolean(helpfulReviews[b.id]))) - (a.helpful + Number(Boolean(helpfulReviews[a.id]))))
+  }, [helpfulReviews, reviewFilter, reviewSort])
+
+
+  useEffect(() => {
+    const ids = ['prezentare', 'istoric-pret', 'proprietari', 'chirii', 'renovari', 'recenzii-proprietate', 'bloc', 'zona']
+    const sections = ids.map((id) => document.getElementById(id)).filter((section): section is HTMLElement => Boolean(section))
+    if (!sections.length || !('IntersectionObserver' in window)) return
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+      if (visible?.target.id) setActiveSection(visible.target.id)
+    }, { rootMargin: '-24% 0px -62% 0px', threshold: [0.05, 0.2, 0.45] })
+    sections.forEach((section) => observer.observe(section))
+    return () => observer.disconnect()
+  }, [slug])
+
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const shareProperty = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      shared.notify('Linkul proprietății a fost copiat')
+    } catch {
+      shared.notify(`Linkul proprietății: ${window.location.href}`)
+    }
+  }
+
+  const submitContact = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!contactName.trim() || contactPhone.replace(/\D/g, '').length < 8) {
+      shared.notify('Completează numele și un număr de telefon valid.')
+      return
+    }
+    setModal(null)
+    setContactName('')
+    setContactPhone('')
+    shared.notify('Solicitarea demonstrativă a fost înregistrată')
+  }
+
+  const submitReport = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (reportDetails.trim().length < 10) {
+      shared.notify('Descrie problema în cel puțin 10 caractere.')
+      return
+    }
+    setModal(null)
+    setReportDetails('')
+    shared.notify('Raportarea a fost trimisă spre analiză')
+  }
 
   return (
     <div className="property-page">
       <div className="container property-topbar">
         <div className="breadcrumb"><button type="button" onClick={() => shared.navigate(isRent ? '/chirie' : '/cumpara')}><Icon name="arrow-right" className="back-icon" /> Înapoi la rezultate</button><span>/</span><span>{property.district}</span><span>/</span><strong>{property.address}</strong></div>
-        <div className="property-top-actions"><button type="button" onClick={() => shared.toggleFavorite(property.id)}><Icon name="heart" />{saved ? 'Salvat' : 'Salvează'}</button><button type="button" onClick={() => shared.toggleCompare(property.id)}><Icon name="compare" />{compared ? 'În comparație' : 'Compară'}</button><button type="button" onClick={() => shared.notify('Linkul proprietății a fost copiat')}><Icon name="arrow-right" />Distribuie</button><button type="button" onClick={() => setModal('report')}><Icon name="shield" />Raportează</button></div>
+        <div className="property-top-actions"><button type="button" onClick={() => shared.toggleFavorite(property.id)}><Icon name="heart" />{saved ? 'Salvat' : 'Salvează'}</button><button type="button" onClick={() => shared.toggleCompare(property.id)}><Icon name="compare" />{compared ? 'În comparație' : 'Compară'}</button><button type="button" onClick={shareProperty}><Icon name="arrow-right" />Distribuie</button><button type="button" onClick={() => setModal('report')}><Icon name="shield" />Raportează</button></div>
       </div>
 
       <div className="container property-stage-label decision-stage"><span>01</span><div><strong>Decizia imediată</strong><small>Ofertă, fotografii, costuri și contact</small></div></div>
@@ -42,6 +117,12 @@ export function PropertyPage({ slug, ...shared }: PropertyPageProps) {
         <div className="property-summary-main">
           <div className="summary-badges"><span className={`badge badge-${property.mode}`}>{isRent ? 'De închiriat' : 'De vânzare'}</span><span className="trust-label verified"><Icon name="shield" size={14} /> Verificat prin document</span><span className="trust-label owner">Confirmat de proprietar</span></div>
           <h1>{property.address}</h1><p className="summary-location">{property.district} · Complexul {property.complex} · <button type="button" onClick={() => shared.navigate('/harta')}>Vezi pe hartă</button></p>
+          <div className="property-current-state" aria-label="Starea actuală a proprietății">
+            <div><span className="state-signal available" /><p><small>Status actual</small><strong>{property.status === 'unavailable' ? 'Indisponibilă' : isRent ? 'Disponibilă de la 1 august' : 'Vizionări disponibile'}</strong></p></div>
+            <div><Icon name="clock" size={18} /><p><small>Ultima verificare</small><strong>Acum 4 zile</strong></p></div>
+            <div><Icon name="renovation" size={18} /><p><small>Stare interior</small><strong>Renovat complet · 2024</strong></p></div>
+            <div><Icon name="shield" size={18} /><p><small>Dosar verificat</small><strong>82% complet</strong></p></div>
+          </div>
           <div className="summary-price-row">
             <div className="summary-current-price"><span>Preț actual</span><strong>{money(property.price)}{isRent && <small>/lună</small>}</strong>{!isRent && <small>{money(property.pricePerSqm)}/m²</small>}</div>
             <div className="summary-old-price"><span>Preț anterior</span><strong>{money(property.previousPrice)}{isRent && '/lună'}</strong></div>
@@ -62,7 +143,7 @@ export function PropertyPage({ slug, ...shared }: PropertyPageProps) {
         </aside>
       </section>
 
-      <nav className="property-anchor-nav" aria-label="Secțiunile proprietății"><div className="container">{[['Prezentare', 'prezentare'], ['Istoric preț', 'istoric-pret'], ['Proprietate', 'proprietari'], ['Chirii', 'chirii'], ['Renovări', 'renovari'], ['Recenzii', 'recenzii-proprietate'], ['Bloc', 'bloc'], ['Zonă', 'zona']].map(([label, id]) => <a href={`#${id}`} key={id}>{label}</a>)}</div></nav>
+      <nav className="property-anchor-nav" aria-label="Secțiunile proprietății"><div className="container">{[['Prezentare', 'prezentare'], ['Istoric preț', 'istoric-pret'], ['Proprietate', 'proprietari'], ['Chirii', 'chirii'], ['Renovări', 'renovari'], ['Recenzii', 'recenzii-proprietate'], ['Bloc', 'bloc'], ['Zonă', 'zona']].map(([label, id]) => <button className={activeSection === id ? 'active' : ''} type="button" aria-current={activeSection === id ? 'location' : undefined} onClick={() => scrollToSection(id)} key={id}>{label}</button>)}</div></nav>
 
       <div className="container property-content-layout">
         <div className="property-sections">
@@ -75,8 +156,8 @@ export function PropertyPage({ slug, ...shared }: PropertyPageProps) {
           <div className="property-level-divider risk-level"><span>02</span><div><strong>Istoric și riscuri</strong><small>Prețuri, proprietate, ocupare, renovări și surse</small></div><Icon name="history" /></div>
 
           <section className="detail-section" id="istoric-pret">
-            <div className="detail-section-head"><div><span className="section-kicker">Valoarea centrală a dosarului</span><h2>Istoricul și analiza prețului</h2><p>Evenimentele sunt marcate după tip și afișate împreună cu sursa.</p></div><div className="history-switch"><button className="active" type="button">Chirie</button><button type="button">Vânzare</button></div></div>
-            <div className="history-metrics"><div><span>Preț curent</span><strong>€650/lună</strong></div><div><span>Preț anterior</span><strong>€615/lună</strong></div><div><span>Minim înregistrat</span><strong>€450/lună</strong></div><div><span>Maxim înregistrat</span><strong>€650/lună</strong></div><div><span>Schimbare totală</span><strong className="semantic-positive">+44,4%</strong></div><div><span>Preț/m²</span><strong>€10,15</strong></div></div>
+            <div className="detail-section-head"><div><span className="section-kicker">Valoarea centrală a dosarului</span><h2>Istoricul și analiza prețului</h2><p>Evenimentele sunt marcate după tip și afișate împreună cu sursa.</p></div><div className="history-switch"><button className={historyMode === 'rent' ? 'active' : ''} type="button" onClick={() => setHistoryMode('rent')}>Chirie</button><button className={historyMode === 'sale' ? 'active' : ''} type="button" onClick={() => setHistoryMode('sale')}>Vânzare</button></div></div>
+            <div className="history-metrics">{historyMetrics.map(([label, value]) => <div key={label}><span>{label}</span><strong className={label === 'Schimbare totală' ? 'semantic-positive' : ''}>{value}</strong></div>)}</div>
             <div className="price-chart" aria-label="Grafic demonstrativ al evoluției chiriei între 2019 și 2026">
               <div className="chart-axis"><span>€700</span><span>€600</span><span>€500</span><span>€400</span></div>
               <div className="chart-grid-lines"><i /><i /><i /><i /></div>
@@ -86,7 +167,7 @@ export function PropertyPage({ slug, ...shared }: PropertyPageProps) {
               <div className="chart-events"><span className="e1">Listare</span><span className="e2">Contract</span><span className="e3">Renovare</span><span className="e4">Listare</span></div>
               <div className="chart-years"><span>2019</span><span>2020</span><span>2022</span><span>2024</span><span>2025</span><span>2026</span></div>
             </div>
-            <div className="history-table-wrap"><table className="history-table"><thead><tr><th>Data</th><th>Eveniment</th><th>Preț</th><th>Diferență</th><th>Sursa</th><th>Verificare</th></tr></thead><tbody>{historyEvents.map((item) => <tr key={item.date}><td>{item.date}</td><td><strong>{item.event}</strong></td><td>{item.price}</td><td className={item.change.startsWith('+') ? 'semantic-positive' : ''}>{item.change}</td><td>{item.source}</td><td><span className="trust-label verified">✓ {item.trust}</span></td></tr>)}</tbody></table></div>
+            <div className="history-table-wrap"><table className="history-table"><thead><tr><th>Data</th><th>Eveniment</th><th>Preț</th><th>Diferență</th><th>Sursa</th><th>Verificare</th></tr></thead><tbody>{visibleHistoryEvents.map((item) => <tr key={item.date}><td>{item.date}</td><td><strong>{item.event}</strong></td><td>{item.price}</td><td className={item.change.startsWith('+') ? 'semantic-positive' : ''}>{item.change}</td><td>{item.source}</td><td><span className="trust-label verified">✓ {item.trust}</span></td></tr>)}</tbody></table></div>
           </section>
 
           <section className="detail-section" id="proprietari">
@@ -110,8 +191,8 @@ export function PropertyPage({ slug, ...shared }: PropertyPageProps) {
           <section className="detail-section" id="recenzii-proprietate">
             <div className="detail-section-head"><div><span className="section-kicker">46 de experiențe</span><h2>Recenzii despre proprietate</h2></div><button className="button button-secondary" type="button" onClick={() => shared.navigate('/scrie-recenzie')}>Scrie o recenzie</button></div>
             <div className="review-overview"><div className="rating-total"><strong>4,6</strong><span>★★★★★</span><small>din 46 recenzii</small></div><div className="rating-bars">{[['5', 72], ['4', 20], ['3', 6], ['2', 2], ['1', 0]].map(([stars, value]) => <div key={stars}><span>{stars}</span><i><b style={{ width: `${value}%` }} /></i><small>{value}%</small></div>)}</div><div className="category-ratings">{[['Starea apartamentului', '4,8'], ['Izolare fonică', '4,1'], ['Încălzire', '4,7'], ['Proprietar', '4,8'], ['Bloc', '4,4'], ['Zonă', '4,6'], ['Calitate/preț', '4,3']].map(([label, score]) => <div key={label}><span>{label}</span><strong>{score}</strong></div>)}</div></div>
-            <div className="review-toolbar"><div><button className="active" type="button">Toate</button><button type="button">Chiriași</button><button type="button">Cumpărători</button><button type="button">Cu fotografii</button></div><select aria-label="Sortează recenziile"><option>Cele mai utile</option><option>Cele mai noi</option><option>Rating mare</option></select></div>
-            <div className="property-review-list">{recentReviews.slice(0, 2).map((review) => <article className="review-card" key={review.id}><header><span className="avatar">{review.initials}</span><div><strong>{review.name}</strong><small>{review.role} · {review.period}</small></div><b>★ {review.rating}</b></header><p>{review.text}</p><div className="review-pros-cons"><span className="pros"><b>Avantaje</b> {review.pros}</span><span className="cons"><b>Dezavantaje</b> {review.cons}</span></div><div className="owner-response"><strong>Răspunsul proprietarului</strong><p>Mulțumesc pentru feedback. Am transmis administratorului observația despre parcare.</p></div><footer><button type="button">Util ({review.helpful})</button><button type="button" onClick={() => setModal('report')}>Raportează</button></footer></article>)}</div>
+            <div className="review-toolbar"><div>{['Toate', 'Chiriași', 'Cumpărători', 'Cu fotografii'].map((item) => <button className={reviewFilter === item ? 'active' : ''} type="button" onClick={() => setReviewFilter(item)} key={item}>{item}</button>)}</div><select aria-label="Sortează recenziile" value={reviewSort} onChange={(event) => setReviewSort(event.target.value)}><option>Cele mai utile</option><option>Cele mai noi</option><option>Rating mare</option></select></div>
+            <div className="property-review-list">{propertyReviews.length ? propertyReviews.map((review) => <article className="review-card" key={review.id}><header><span className="avatar">{review.initials}</span><div><strong>{review.name}</strong><small>{review.role} · {review.period}</small></div><b>★ {review.rating}</b></header><p>{review.text}</p><div className="review-pros-cons"><span className="pros"><b>Avantaje</b> {review.pros}</span><span className="cons"><b>Dezavantaje</b> {review.cons}</span></div><div className="owner-response"><strong>Răspunsul proprietarului</strong><p>Mulțumesc pentru feedback. Am transmis administratorului observația despre parcare.</p></div><footer><button className={helpfulReviews[review.id] ? 'active' : ''} type="button" onClick={() => setHelpfulReviews((current) => ({ ...current, [review.id]: !current[review.id] }))}>{helpfulReviews[review.id] ? 'Marcat util' : 'Util'} ({review.helpful + Number(Boolean(helpfulReviews[review.id]))})</button><button type="button" onClick={() => setModal('report')}>Raportează</button></footer></article>) : <div className="empty-state"><span>☆</span><h3>Nicio recenzie pentru filtrul selectat</h3><button type="button" onClick={() => setReviewFilter('Toate')}>Arată toate recenziile</button></div>}</div>
           </section>
 
           <section className="detail-section" id="bloc">
@@ -132,7 +213,7 @@ export function PropertyPage({ slug, ...shared }: PropertyPageProps) {
       <div className="mobile-property-cta"><div><span>{isRent ? 'Chirie lunară' : 'Preț cerut'}</span><strong>{money(property.price)}{isRent && <small>/lună</small>}</strong></div><button className="button button-primary" type="button" onClick={() => setModal('contact')}>{isRent ? 'Solicită vizionare' : 'Contactează vânzătorul'}</button></div>
 
       {galleryOpen && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Galeria proprietății"><div className="gallery-modal"><button className="modal-close" type="button" aria-label="Închide galeria" onClick={() => setGalleryOpen(false)}>×</button><h2>Fotografii verificate</h2><p>4 din 18 fotografii demonstrative · realizate la 08 iulie 2026</p><div>{galleryImages.map((image) => <img src={image.src} alt={image.alt} key={image.src} />)}</div></div></div>}
-      {modal && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="property-modal-title"><div className="form-modal"><button className="modal-close" type="button" aria-label="Închide" onClick={() => setModal(null)}>×</button>{modal === 'contact' ? <><span className="eyebrow">Solicitare demonstrativă</span><h2 id="property-modal-title">Programează o vizionare</h2><p>Alege o zi și lasă datele la care dorești să fii contactat.</p><label>Nume<input placeholder="Numele tău" /></label><label>Telefon<input placeholder="+373 6xx xxx xx" /></label><label>Zi preferată<select><option>Sâmbătă, 18 iulie</option><option>Duminică, 19 iulie</option><option>Luni, 20 iulie</option></select></label><button className="button button-primary button-full" type="button" onClick={() => { setModal(null); shared.notify('Solicitarea demonstrativă a fost înregistrată') }}>Trimite solicitarea</button></> : <><span className="eyebrow">Siguranța comunității</span><h2 id="property-modal-title">Raportează o informație</h2><p>Spune-ne ce pare incorect. Raportarea nu va fi publicată automat.</p><label>Motiv<select><option>Preț incorect</option><option>Fotografii neactuale</option><option>Informație personală</option><option>Conținut înșelător</option></select></label><label>Detalii<textarea placeholder="Descrie problema…" /></label><button className="button button-primary button-full" type="button" onClick={() => { setModal(null); shared.notify('Raportarea a fost trimisă spre analiză') }}>Trimite raportarea</button></>}</div></div>}
+      {modal && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="property-modal-title">{modal === 'contact' ? <form className="form-modal" onSubmit={submitContact}><button className="modal-close" type="button" aria-label="Închide" onClick={() => setModal(null)}>×</button><span className="eyebrow">Solicitare demonstrativă</span><h2 id="property-modal-title">Programează o vizionare</h2><p>Alege o zi și lasă datele la care dorești să fii contactat.</p><label>Nume<input value={contactName} onChange={(event) => setContactName(event.target.value)} placeholder="Numele tău" required /></label><label>Telefon<input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} placeholder="+373 6xx xxx xx" required /></label><label>Zi preferată<select><option>Sâmbătă, 18 iulie</option><option>Duminică, 19 iulie</option><option>Luni, 20 iulie</option></select></label><button className="button button-primary button-full" type="submit">Trimite solicitarea</button></form> : <form className="form-modal" onSubmit={submitReport}><button className="modal-close" type="button" aria-label="Închide" onClick={() => setModal(null)}>×</button><span className="eyebrow">Siguranța comunității</span><h2 id="property-modal-title">Raportează o informație</h2><p>Spune-ne ce pare incorect. Raportarea nu va fi publicată automat.</p><label>Motiv<select><option>Preț incorect</option><option>Fotografii neactuale</option><option>Informație personală</option><option>Conținut înșelător</option></select></label><label>Detalii<textarea value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} placeholder="Descrie problema…" required /></label><button className="button button-primary button-full" type="submit">Trimite raportarea</button></form>}</div>}
     </div>
   )
 }
